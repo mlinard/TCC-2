@@ -1,0 +1,59 @@
+Metodologia
+Previsão do Preço do Bitcoin com Modelo SARIMA
+1. Visão Geral da Abordagem
+Este trabalho emprega o modelo SARIMA (Seasonal AutoRegressive Integrated Moving Average) para modelagem e previsão da série temporal de preços mensais do Bitcoin (BTC/USD). A abordagem segue o fluxo clássico de análise de séries temporais: coleta e pré-processamento dos dados, transformação logarítmica, detecção e tratamento de outliers, particionamento treino/teste, seleção automática de hiperparâmetros via AIC e avaliação quantitativa do poder preditivo.
+2. Base de Dados e Preparação
+2.1 Fonte e Carregamento
+Os dados são carregados a partir do arquivo btc_dataset_com_sinais.csv. O sistema identifica automaticamente a coluna de data (suportando rótulos como date, timestamp, mes, month, entre outros) e a coluna de preço (weighted_price, close, price, adj_close e variações similares). Registros anteriores a janeiro de 2019 são descartados para manter o foco no ciclo de mercado mais recente.
+2.2 Reamostragem Mensal
+Caso a frequência dos dados não seja mensal, a série é reamostrada para frequência mensal (MS – Month Start) utilizando o último valor registrado de cada mês. Isso garante consistência temporal necessária para a modelagem sazonal com período s = 12.
+2.3 Transformação Logarítmica
+Aplica-se transformação logarítmica natural (ln) sobre os preços antes de qualquer etapa de modelagem. Essa escolha é motivada por três razões principais:
+⦁	Estabilização da variância: a variância do Bitcoin cresce com o nível do preço (heterocedasticidade), e o log a reduz a níveis mais estáveis.
+⦁	Linearização: transforma retornos multiplicativos em aditivos, compatíveis com os pressupostos lineares do SARIMA.
+⦁	Interpretação: as diferenças no domínio log correspondem a retornos percentuais, facilitando a avaliação econômica.
+3. Detecção e Tratamento de Outliers
+Outliers são detectados por uma abordagem de janela móvel robusta. Para cada observação na série log-transformada, calcula-se a mediana e o intervalo interquartílico (IQR) dentro de uma janela centrada de 7 meses. Um ponto é classificado como outlier se ultrapassar 3,0 × IQR acima ou abaixo da mediana local. Este critério é conservador: variações extremas mas realísticas do Bitcoin são preservadas; apenas movimentos estruturalmente improbáveis são sinalizados. Os valores identificados como outliers são substituídos por NaN e interpolados linearmente, garantindo continuidade da série.
+4. Particionamento Treino/Teste
+A série é dividida em 80% para treinamento e 20% para teste, respeitando a ordem cronológica dos dados (sem embaralhamento). Essa divisão simula um cenário realista de previsão fora da amostra (out-of-sample), onde o modelo é treinado exclusivamente em observações passadas e avaliado em observaões futuras que nunca viu durante o ajuste.
+5. Teste de Estacionariedade (ADF)
+Aplica-se o Teste Aumentado de Dickey-Fuller (ADF) à parcela de treinamento da série log-transformada. O resultado determina o parâmetro de integração d do modelo: se o p-valor for ≤ 0,05 (rejeição da hipótese nula de raíz unitária), adota-se d = 0; caso contrário, d = 1, aplicando uma diferenciação. Esse procedimento automatizado garante que a escolha do nível de integração seja guiada por evidência estatística formal.
+6. Seleção do Modelo SARIMA
+6.1 Estrutura do Modelo
+O modelo SARIMA(p,d,q)(P,D,Q)[s] estende o ARIMA clássico com termos sazonais de período s = 12 meses. Os parâmetros não-sazonais (p, q) capturam autocorrelações de curto prazo, enquanto os sazonais (P, D, Q) modelam padrões que se repetem anualmente, característicos dos ciclos do Bitcoin.
+6.2 Grid Search por AIC
+A seleção de hiperparâmetros é feita por busca em grade (grid search) sobre 8 configurações candidatas, combinando diferentes valores de p, q, P e Q:
+1.	SARIMA(1,d,1)(1,1,1)[12]
+2.	SARIMA(2,d,1)(1,1,1)[12]
+3.	SARIMA(1,d,2)(1,1,1)[12]
+4.	SARIMA(2,d,2)(1,1,1)[12]
+5.	SARIMA(3,d,1)(1,1,1)[12]
+6.	SARIMA(1,d,3)(1,1,1)[12]
+7.	SARIMA(1,d,1)(0,1,1)[12]
+8.	SARIMA(2,d,1)(0,1,1)[12]
+Para cada configuração, o modelo é estimado por Máxima Verossimilhança e avaliado pelo Critério de Informação de Akaike (AIC). O modelo com menor AIC é selecionado, equilibrando qualidade de ajuste e parcimônia. Configurações que não convergem são descartadas automaticamente.
+7. Geração de Previsões
+O modelo selecionado gera previsões para todos os meses do conjunto de teste (previsão multi-passo). Além dos valores pontuais, o método extrai intervalos de confiança de 95% a partir da distribuição preditiva assintótica do SARIMAX. Todos os valores no domínio logarítmico são reconvertidos à escala original via exponencial (exp), e um clipping conservador (± log(4) em relação ao extremo do treino) prevé extrapolacões absurdas. As previsões de ajuste in-sample recebem ainda um filtro de sanidade que suprime picos irreais do modelo, garantindo visualização coerente.
+8. Métricas de Avaliação
+O desempenho preditivo é mensurado por cinco indicadores calculados exclusivamente sobre o conjunto de teste:
+⦁	MAE (Mean Absolute Error): erro absoluto médio em dólares, intuitivo e robusto a outliers.
+⦁	RMSE (Root Mean Squared Error): penaliza erros grandes mais severamente, relevante dada a volatilidade do BTC.
+⦁	MAPE (Mean Absolute Percentage Error): erro percentual médio, permite comparação entre períodos de diferentes níveis de preço.
+⦁	MASE (Mean Absolute Scaled Error): normaliza o MAE pelo erro de um modelo Naive (passeio aleatório). MASE < 1 indica superação do benchmark.
+⦁	DAC (Directional Accuracy): percentual de meses em que o modelo acerta a direção do movimento (alta/baixa), relevante para decisões de trading.
+9. Visualizações
+São gerados três gráficos para análise visual dos resultados:
+1.	Série Completa: preços reais (treino + teste), curva de ajuste in-sample e previsões com intervalo de confiança de 95%, marcando a fronteira treino/teste.
+2.	Zoom no Teste: comparação focada entre real e previsto no período de avaliação, com IC 95%.
+3.	Real vs. Previsto (Scatter): diagrama de dispersão com linha de referência ideal (45°) e coeficiente R² para avaliação da calibração.
+10. Fluxo Resumido da Metodologia
+1.	Carregamento e filtragem dos dados (a partir de jan/2019).
+2.	Reamostragem mensal (se necessário).
+3.	Transformação logarítmica dos preços.
+4.	Detecção e interpolação de outliers (janela 7, fator 3×IQR).
+5.	Divisão temporal 80/20 (treino/teste).
+6.	Teste ADF para determinação do parâmetro d.
+7.	Grid Search SARIMA com seleção por AIC.
+8.	Previsão multi-passo com intervalos de confiança de 95%.
+9.	Reconversão à escala original (exponencial).
+10.	Avaliação com MAE, RMSE, MAPE, MASE e DAC.
