@@ -1,0 +1,38 @@
+Esta é a documentação metodológica consolidada para o seu TCC. Ela descreve a arquitetura de Stacking Dinâmico para múltiplos horizontes de tempo, fundamentada em princípios de Ciência de Dados e Processamento de Sinais.
+
+Metodologia: Modelo Híbrido de Especialistas (Stacking Dinâmico)
+1. Visão Geral da Arquitetura
+A metodologia propõe um Meta-Modelo de Integração baseado na técnica de Stacked Generalization (Dietterich, 2000). O sistema é projetado para operar de forma modular, com uma instância específica para cada horizonte de previsão: T+1, T+3, T+5, T+10 e T+15.
+A premissa central é que a eficiência dos modelos base (SARIMA e GRU) varia conforme o horizonte temporal e o estado do mercado. O modelo híbrido atua como um "juiz" que pondera as previsões baseando-se em variáveis de contexto.
+
+2. Componentes e Fluxo de Dados
+O modelo híbrido é composto por três camadas de processamento:
+A. Camada de Especialistas (Modelos Base)
+SARIMA (Estatístico/Sazonal): Focado em capturar a autocorrelação e ciclos periódicos do ativo.
+GRU (Deep Learning/Regimes): Rede neural recorrente treinada via Mixture of Experts (MoE) para capturar não-linearidades e padrões específicos de regimes (Bull, Bear, Neutro).
+B. Camada de Engenharia de Contexto (Inputs do Meta-Modelo)
+Para evitar o "aprendizado preguiçoso", o meta-modelo recebe cinco entradas distintas para cada data t:
+Previsão SARIMA (T+n): A projeção estatística para o horizonte alvo.
+Previsão GRU (T+n): A projeção da rede neural para o horizonte alvo.
+Diferencial de Regime (HMM): O estado de mercado identificado pelo modelo de Markov (Fase 1).
+Volatilidade Recente (\sigma): Calculada automaticamente pelo sistema como o desvio padrão dos últimos 5 dias, servindo como indicador de estresse do mercado.
+Erro Residual Recente (Bias): Mapeamento do erro médio cometido pelos modelos nos últimos 3 dias para compensar tendências de viés.
+C. Camada de Decisão (Meta-Modelo)
+O algoritmo escolhido é a Regressão Ridge. Este modelo define os pesos (\beta) de cada especialista através da minimização do Erro Quadrático Médio (MSE), aplicando uma Penalidade L2 (Regularização).
+Função da Penalidade: Força o modelo a manter pesos equilibrados e conservadores, impedindo que o sistema "decore" ruídos do passado e garantindo a capacidade de generalização para dados futuros.
+
+3. Procedimento Experimental (Passo a Passo)
+Geração de Alvos Deslocados: Para cada n {1, 3, 5, 10, 15}, o sistema desloca o alvo real (T+n) para alinhar com as previsões feitas em T.
+Treinamento com Separação Temporal:
+Conjunto de Treino do Meta-Modelo: Onde o algoritmo observa as previsões e o preço real para aprender os pesos ideais.
+Conjunto de Teste (Hold-out): Dados inéditos onde o modelo aplica os pesos aprendidos sem conhecer o preço real, validando a eficácia da lógica.
+Métricas de Avaliação: O sucesso é medido pelo MAPE (Erro Percentual Médio), RMSE e Acurácia Direcional (DAC). O modelo híbrido é validado se, e somente se, suas métricas superarem as dos modelos isolados nos dados de teste.
+
+4. Fontes e Embasamento Teórico
+As informações e a estrutura lógica desta metodologia baseiam-se nos seguintes pilares científicos:
+Stacking e Ensemble Learning: Baseado no Teorema de Dietterich (2000), que postula que a combinação de modelos diversos (linear e não-linear) reduz o erro de generalização.
+Processamento de Sinais: O uso de CEEMDAN (Torres et al., 2011) para extrair as IMFs que alimentam a GRU, permitindo uma decomposição limpa do alvo.
+Modelagem de Regimes: Fundamentada na teoria de Cadeias de Markov Escondidas (HMM) para segmentação de séries temporais financeiras não estacionárias.
+Regularização Ridge: Baseada na técnica de Tikhonov Regularization, utilizada para resolver problemas mal-postos e evitar o overfitting em modelos com variáveis correlacionadas.
+Modelagem Sazonal: Estruturada sobre o arcabouço de Box-Jenkins para modelos SARIMA.
+
