@@ -1,0 +1,27 @@
+Metodologia: Modelo Híbrido de Especialistas (Stacking Dinâmico)
+1. Cronologia de Dados e Divisão de Fases
+A integridade desta pesquisa baseia-se na separação cronológica estrita, dividida em três estágios para evitar qualquer forma de antecipação de dados (Data Leakage):
+Fase de Treino dos Especialistas (Até 31 de Março de 2025): Período em que o modelo SARIMA e a rede GRU são ajustados individualmente aos dados históricos.
+Fase de Treino do Híbrido (1º de Abril a 30 de Abril de 2025): Os modelos base geram suas previsões de teste (T+n) para este mês. Esses alvos de abril servem exclusivamente para o treinamento dos pesos do modelo híbrido.
+Fase de Teste Final (A partir de 1º de Maio de 2025): É realizado um Teste 2 para o SARIMA e para a GRU. O modelo híbrido opera sobre os resultados deste novo conjunto de dados, gerando as métricas finais de comparação para o TCC.
+
+2. Entradas de Dados (O que o código recebe)
+Para cada horizonte T+n (onde n {1, 3, 5, 10, 15}), o sistema de hibridização recebe dois inputs externos fundamentais:
+Previsões Nominais (T+n): Os valores escalares exatos projetados pelo SARIMA e pela GRU para o horizonte específico.
+Regime de Mercado (HMM): O rótulo categórico (Bull, Bear ou Neutro) identificado na Fase 1. Este parâmetro funciona como o contexto psicológico e estatístico que orienta a ponderação dos modelos.
+
+3. Processamento Interno (Cálculos de Integridade)
+A fim de garantir a autonomia do sistema e eliminar entradas manuais, o código realiza duas operações analíticas logo no início da execução:
+Volatilidade Histórica: Cálculo automático do desvio padrão do Preco_Bruto nos últimos 5 dias. Esta variável indica o nível de "estresse" do mercado, influenciando a confiabilidade atribuída ao modelo linear versus o não-linear.
+Erro Recente (Bias): Cálculo do resíduo acumulado (Valor Real menos Valor Previsto) dos dias anteriores. Este processamento mapeia a tendência de erro sistemático dos especialistas, permitindo ao híbrido aplicar compensações em tempo real.
+
+4. O Mecanismo de Inteligência (Regressão Ridge)
+Com as previsões, o regime, a volatilidade e o bias em mãos, o modelo aplica a Regularização Ridge (L2).
+Este mecanismo atua como o "fiel da balança", distribuindo os pesos entre o SARIMA e a GRU de forma dinâmica. A penalidade L2 é crucial para minimizar o erro final sem permitir que o modelo se torne "viciado" em padrões de curto prazo, garantindo que o aprendizado de abril seja replicável para a volatilidade de maio.
+
+5. Saída e Validação (Documentação de Performance)
+O estágio final da metodologia foca na extração de resultados comparativos para a redação do TCC:
+Target de Saída: O preço final híbrido consolidado para T+n.
+Avaliação de Performance: Comparação rigorosa das métricas MAPE, RMSE, MAE e DAC (Acurácia Direcional) entre os três modelos (SARIMA, GRU e Híbrido). A análise busca provar que a integração de paradigmas estatísticos e neurais em maio supera o desempenho individual de cada especialista isoladamente.
+
+
